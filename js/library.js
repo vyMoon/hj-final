@@ -15,12 +15,78 @@ function finderAll(needle, container) {
     return Array.from( document.querySelectorAll(needle) );
 }
 
+function elementMaker(tag, ...classes) {
+    const element = document.createElement(tag);
+    // console.log(classes.length)
+    if (classes.length > 0) {
+        classes.forEach( el => element.classList.add(el) )
+    }
+    return element;
+}
+
+// console.log(elementMaker('form'))
+
+function commentMaker(date, message) {
+    const dateStr = elementMaker('p', 'comment__time');
+    dateStr.innerText = date;
+    const messageStr = elementMaker('p', 'comment__message');
+    messageStr.innerText = message;
+    const commentContainer = elementMaker('div', 'comment');
+    commentContainer.appendChild(dateStr);
+    commentContainer.appendChild(messageStr);
+
+    return commentContainer
+}
+
+function commentFormMaker() {
+    const form = elementMaker('form', 'comments__form');
+    form.appendChild(elementMaker('span', 'comments__marker'));
+
+    const check = elementMaker('input', 'comments__marker-checkbox');
+    check.setAttribute('type', 'checkbox');
+    form.appendChild(check);
+
+    const body = elementMaker('div', 'comments__body');
+
+    const loaderContainer = elementMaker('div', 'comment');
+    loaderContainer.style.display = 'none';
+
+    const loader = elementMaker('div', 'loader')
+    for (let i = 0; i < 5; i++) {
+        loader.appendChild(elementMaker('span'));
+    }
+    loaderContainer.appendChild(loader);
+    body.appendChild(loaderContainer);
+
+    const textArea = elementMaker('textarea', 'comments__input');
+    textArea.setAttribute('type', 'text');
+    textArea.setAttribute('placeholder', 'Напишите ответ...');
+    body.appendChild(textArea);
+
+    const inputClose = elementMaker('input', 'comments__close');
+    inputClose.setAttribute('type', 'button');
+    inputClose.setAttribute('value', 'Закрыть');
+    body.appendChild(inputClose);
+
+    const inputSend = elementMaker('input', 'comments__submit');
+    inputSend.setAttribute('type', 'submit');
+    inputSend.setAttribute('value', 'Отправить');
+    body.appendChild(inputSend);
+
+    form.appendChild(body);
+
+    return form;
+
+}
+
+// console.log(commentFormMaker());
+
 // вид по умолчанию при открытии
 
 function start() {
     commentsForm.style.display = 'none';
     img.src = '';
-    console.log(localStorage.menuPosition)
+    // console.log(localStorage.menuPosition)
 
     menuElementsHiden();
     menuNew.style.display = 'inline-block';
@@ -239,15 +305,21 @@ function imgLoad(file) {
             if (imgXML.status === 200) {
 
                 const response = JSON.parse(imgXML.responseText);
-                // console.log(response);
                 img.src = response.url;
+                mask.src = '';
                 localStorage.id = response.id;
 
                 const ws = new WebSocket(`wss://neto-api.herokuapp.com/pic/${localStorage.id}`);
 
-                ws.addEventListener('message', event => {
-                    console.log(event.data);
-                })
+                setInterval( () => {
+                    if ( !drawing && needsSend) {
+                        doodle.toBlob((el) => ws.send(el));
+                        needsSend = false;
+                    }
+                }, 1000);
+
+                ws.addEventListener('message', wsMessage)
+
 
                 // console.log(localStorage.id)
                 img.addEventListener('load', function() {
@@ -257,6 +329,7 @@ function imgLoad(file) {
                     const imgBound = img.getBoundingClientRect();
 
                     elementStyler(doodle, imgBound);
+                    // elementStyler(mask, imgBound);
                     elementStyler(commentsContainer, imgBound);
 
                     commentsContainer.style.width = imgBound.width + 'px';
@@ -339,6 +412,15 @@ function tick () {
             smoothCurve(curve.curve, curve.color);
         });
         needsRepaint = false;
+        // const now = new Date();
+        // if (now - date > 1000) {
+        //     console.log('gogogogogogogogog');
+        //     date = new Date(now);
+        //     const wss = new WebSocket(`wss://neto-api.herokuapp.com/pic/${localStorage.id}`);
+
+        //     wss.addEventListener('message', wsMessage)
+        //     wss.send(doodle.toDataURL());
+        // }
     }
     window.requestAnimationFrame(tick);
 }
@@ -376,82 +458,91 @@ function canvasMousemove(event) {
 
 function canvasDrawingFalse() {
     drawing = false;
+    needsSend = true;
 }
 
 ///////////////////////////////////////////////////комментарии
 
 function commentWorker(event) {
+
     event.stopPropagation();
     // console.log(event.target);
-    // console.log(event.currentTarget === event.target);
 
     if (event.currentTarget === event.target) {
-        // console.log(123123132)
-        const comment = commentExample.cloneNode(true);
+
+        newCommentChecker();
+
+        const comment = commentFormMaker();
         comment.style.display = 'block';
         comment.style.position = 'absolute';
         comment.style.top = event.offsetY + 'px';
         comment.style.left = event.offsetX + 'px';
+        comment.dataset.id = 'new';
+
+        const commentCheckBox = finder('.comments__marker-checkbox', comment);
+        commentCheckBox.addEventListener('click', onlyOneOpenCommentBody)
 
         commentsContainer.appendChild(comment);
     }
 
     if (event.target.classList.contains('comments__close')) {
        
-        if (event.target.parentElement.parentElement.dataset.id === undefined) {
-            console.log('deldeldeldel');
+        if (event.target.parentElement.parentElement.dataset.id === 'new') {
+            // console.log('deldeldeldel');
             event.target.parentElement.parentElement.parentElement.removeChild(event.target.parentElement.parentElement)
+        } else {
+            finder('.comments__marker-checkbox', event.target.parentElement.parentElement).checked = false;
         }
 
     }
 
     if (event.target.classList.contains('comments__submit')) {
         event.preventDefault();
-        // console.log('submit')
-        const commentBounding = event.target.parentElement.parentElement.getBoundingClientRect();
+        
+        const commentText = finder('.comments__input', event.target.parentElement).value.trim();
+        
+        if (commentText !== '') {
+            const commentBounding = event.target.parentElement.parentElement.getBoundingClientRect();
+            // console.log(commentBounding);
 
-        console.log(commentBounding);
-        console.log(finder('.comments__input', event.target.parentElement).value)
+            // приходит 500 ошибка и сообщение что не заданы кординаты
+            // const messageFormData = new FormData();
+            // messageFormData.append('message', finder('.comments__input', event.target.parentElement).value);
+            // messageFormData.append('left', commentBounding.left);
+            // messageFormData.append('top', commentBounding.top);
+            // imgFormData.append('title', file.name);
 
-        // приходит 500 ошибка и сообщение что не заданы кординаты
-        // const messageFormData = new FormData();
-        // messageFormData.append('message', finder('.comments__input', event.target.parentElement).value);
-        // messageFormData.append('left', commentBounding.left);
-        // messageFormData.append('top', commentBounding.top);
-        // imgFormData.append('title', file.name);
+            // приходит 500 ошибка и сообщение что не заданы кординаты
+            // const body = {
+            //     left: commentBounding.left,
+            //     top: commentBounding.top,
+            //     message: finder('.comments__input', event.target.parentElement).value
+            // }
 
-        // приходит 500 ошибка и сообщение что не заданы кординаты
-        // const body = {
-        //     left: commentBounding.left,
-        //     top: commentBounding.top,
-        //     message: finder('.comments__input', event.target.parentElement).value
-        // }
+            // приходит ответ
+            const body = `message=${commentText}&left=${commentBounding.left}&top=${commentBounding.top}`;
 
-        // приходит ответ
-        const body = 'message=' + finder('.comments__input', event.target.parentElement).value +
-        '&left=' + commentBounding.left +
-        '&top=' + commentBounding.top;
+            const messageXHR = new XMLHttpRequest();
+            const url = `${apiURL}/pic/${localStorage.id}/comments`;
 
-        const messageXHR = new XMLHttpRequest();
-        const url = `${apiURL}/pic/${localStorage.id}/comments`;
-        const loader = finderAll( '.comment' ,event.target.parentElement).find( el => {
-            if (el.firstElementChild.classList.contains('loader')) {
-                return true;
-            }
-        })
-        // console.log(url);
-        messageXHR.open('POST', url);
-        messageXHR.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            const loader = commentLoaderFinder(event.target.parentElement);
+            
+            messageXHR.open('POST', url);
+            messageXHR.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
 
-        messageXHR.addEventListener('loadstart', () => loader.style.display = 'block');
-        messageXHR.addEventListener('loadend', () => loader.style.display = 'none');
-        messageXHR.addEventListener('load', function() {
-            console.log(messageXHR.responseText);
-        })
+            messageXHR.addEventListener('loadstart', () => {
+                finder('.comments__input', event.target.parentElement).value = '';
+                loader.style.display = 'block';
+            });
+            messageXHR.addEventListener('loadend', () => loader.style.display = 'none');
+            messageXHR.addEventListener('load', function() {
+                console.log(messageXHR.responseText);
+            })
 
-        messageXHR.send(body);
-
+            messageXHR.send(body);
+        }
     }
+
 }
 
 function commentsShower() {
@@ -466,4 +557,75 @@ function commentsHider() {
     finderAll('.comments__form', commentsContainer).forEach( el => {
         el.style.display = 'none'
     })
+}
+
+function commentLoaderFinder(constainer) {
+    return  finderAll( '.comment', constainer).find( el => {
+        if (el.firstElementChild.classList.contains('loader')) {
+            return true;
+        }
+    })
+}
+
+function commentsFinder() {
+    return finderAll('.comments__form', commentsContainer)
+}
+
+function onlyOneOpenCommentBody() {
+    const comments = commentsFinder();
+    comments.forEach( el => {
+        if (event.target !== finder('.comments__marker-checkbox', el)) {
+            if (el.dataset.id === 'new') {
+                el.parentElement.removeChild(el);
+            } else {
+                finder('.comments__marker-checkbox', el).checked = false;
+            }
+        }
+    })
+}
+
+function newCommentChecker() {
+    const comments = commentsFinder();
+    comments.forEach( el => {
+        if (el.dataset.id === 'new') {
+            el.parentElement.removeChild(el);
+        } else {
+            finder('.comments__marker-checkbox', el).checked = false;
+        } 
+    })
+}
+
+
+function wsMessage(event) {
+    const response = JSON.parse(event.data)
+    console.log(response)
+
+    if (response.event === 'comment') {
+        // console.log('comment');
+        const comments = commentsFinder();
+        comments.forEach( el => {
+            const commentBounding = el.getBoundingClientRect()
+            if (commentBounding.top === response.comment.top && commentBounding.left === response.comment.left) {
+                // console.log('find');
+                el.dataset.id = 'active';
+                const date = new Date(response.comment.timestamp);
+                let mounth = '' + (date.getMonth() + 1);
+                if (mounth.length === 1) {
+                    mounth = '0' + mounth;
+                }
+
+                const dateStr = `${date.getDate()}.${mounth}.${('' + date.getFullYear()).slice(2)} ${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`
+                // console.log(commentMaker(dateStr, response.comment.message));
+                finder('.comments__body', el).insertBefore(commentMaker(dateStr, response.comment.message), commentLoaderFinder(finder('.comments__body', el)))
+            }
+        })
+    }
+
+    if (response.event === 'mask') {
+        console.log('masmasmasmasmasmas')
+        const imgBound = img.getBoundingClientRect();
+        elementStyler(mask, imgBound);
+        mask.src = response.url;
+    }
+
 }

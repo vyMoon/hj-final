@@ -21,7 +21,7 @@ menu.addEventListener('click', menuWorker)
 // навешиваем события на инпуты, изменяющие цвет рисования
 colorInputs.forEach( el => el.addEventListener('change', actualColorChanger ) );
 
-// навешиваем события на инпуты, которые показывают и скрывают комментарии
+// навешиваем события на инпуты в меню, которые показывают и скрывают комментарии
 commentsToggleInputs.forEach( el => {
     if ( el.value === 'on') {
         el.addEventListener('change', commentsShower)

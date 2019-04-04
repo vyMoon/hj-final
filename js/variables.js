@@ -27,16 +27,22 @@ const imgTypeError = finder('.error');          // контейнер с оши�
 const imgLoader = finder('.image-loader');      // отображается при загрузке картинки
 
 // хоолст
-const doodle = document.createElement('canvas');
-doodle.classList.add('canvas');
+// const doodle = document.createElement('canvas');
+// doodle.classList.add('canvas');
+const doodle = elementMaker('canvas', 'canvas');
 app.insertBefore(doodle, img.nextElementSibling);
 const ctx = doodle.getContext("2d");
+
+const mask = elementMaker('img', 'mask');
+// mask.src = 'example.png';
+app.insertBefore(mask, doodle);
 
 // переменные для рисования
 const BRUSH_RADIUS = 4;
 let curves = [];
 let drawing = false;
 let needsRepaint = false;
+let needsSend = false;
 
 // контейнер для инпута который будет загружать изображение
 const inputContainer = document.createElement('div');
@@ -59,22 +65,22 @@ let actualColor = paintingColors[ colorInputs.find( el => {return el.hasAttribut
 const commentsToggleInputs = finderAll('.menu__toggle', menuCommentsTools);
 // console.log(commentsToggleInputs[0].value);
 
-
-
 const commentsForm = finder('.comments__form');
 const commentsContainer = document.createElement('div');
 commentsContainer.classList.add('commentsContainer');
 commentsContainer.style.position = 'relative';
 app.insertBefore(commentsContainer, doodle.nextElementSibling);
 
-const commentExample = commentsForm.cloneNode(true);
+// const commentExample = commentsForm.cloneNode(true);
 
-commentExample.children[2].children[1].parentElement.removeChild(commentExample.children[2].children[1])
-commentExample.children[2].children[1].parentElement.removeChild(commentExample.children[2].children[1])
+// commentExample.children[2].children[1].parentElement.removeChild(commentExample.children[2].children[1])
+// commentExample.children[2].children[1].parentElement.removeChild(commentExample.children[2].children[1])
 
-commentExample.children[2].children[0].style.display = 'none';
-commentExample.children[2].children[1].style.display = 'none';
+// commentExample.children[2].children[0].style.display = 'none';
+// commentExample.children[2].children[1].style.display = 'none';
 
-// console.log(commentExample.children[2].children[1])
+// const commentText = finder('.comment', finder('.comments__body', commentsForm));
 
+// let date = new Date();
 // let ws;
+

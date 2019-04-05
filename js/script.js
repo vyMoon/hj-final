@@ -31,3 +31,4 @@ commentsToggleInputs.forEach( el => {
     }
 });
 
+console.log(1)

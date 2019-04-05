@@ -1,6 +1,7 @@
 'use strict';
 
 // функция поиска элементов на странице
+// принимает класс и контэйнер
 function finder(needle, container) {
     if (container !== undefined) {
         return container.querySelector(needle);
@@ -8,6 +9,8 @@ function finder(needle, container) {
     return document.querySelector(needle);
 }
 
+// ищет и возвращает массив этмл элементов
+// принимает класс и контэйнер
 function finderAll(needle, container) {
     if (container !== undefined) {
         return Array.from( container.querySelectorAll(needle) );
@@ -15,16 +18,15 @@ function finderAll(needle, container) {
     return Array.from( document.querySelectorAll(needle) );
 }
 
+// создает и возвращает элемент хтмл, принимет название тэега и классы, оба паратметра строки
 function elementMaker(tag, ...classes) {
     const element = document.createElement(tag);
-    // console.log(classes.length)
     if (classes.length > 0) {
         classes.forEach( el => element.classList.add(el) )
     }
     return element;
 }
 
-// console.log(elementMaker('form'))
 
 function commentMaker(date, message) {
     const dateStr = elementMaker('p', 'comment__time');
@@ -76,17 +78,14 @@ function commentFormMaker() {
     form.appendChild(body);
 
     return form;
-
 }
 
-// console.log(commentFormMaker());
 
 // вид по умолчанию при открытии
 
 function start() {
     commentsForm.style.display = 'none';
     img.src = '';
-    // console.log(localStorage.menuPosition)
 
     menuElementsHiden();
     menuNew.style.display = 'inline-block';
@@ -116,6 +115,41 @@ function start() {
     serverError.classList.add('serverError');
     finder('.error__message', serverError).innerText = 'Попробуйте позже';
     imgTypeError.parentElement.insertBefore(serverError, imgTypeError.nextElementSibling);
+
+    if (sessionStorage.id) {
+
+        const url = `${apiURL}/pic/${sessionStorage.id}`;
+    
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url);
+        xhr.addEventListener('load', function() {
+            
+            if (xhr.status === 200) {
+                
+                const response = JSON.parse(xhr.responseText);
+                // console.log(response)
+                imgWorker(response);
+                menuShowCommentsItem();
+              
+                if (response.mask) {
+                    mask.src = response.mask;
+                }
+
+                if (response.comments) {
+                    for (let i in response.comments) {
+                        
+                        commentAdder(
+                            response.comments[i].top, 
+                            response.comments[i].left, 
+                            response.comments[i].message, 
+                            response.comments[i].timestamp
+                        )
+                    }
+                }
+            }
+        })
+        xhr.send();
+    }
 
 }
 
@@ -149,22 +183,29 @@ function menuShowShareItem() {
     menuShareTools.style.display = 'inline-block';
 }
 
+function menuShowCommentsItem() {
+    menuBurger.style.display = 'inline-block';
+    menuComments.style.display = 'inline-block';
+    menuCommentsTools.style.display = 'inline-block';
+
+    commentsContainer.style.zIndex = 2;
+    doodle.style.zIndex = 1;
+
+    commentsContainer.addEventListener('click', commentWorker);
+}
+
 function menuWorker(event) {
+
     if (event.target.classList.contains('burger') || event.target.parentElement.classList.contains('burger')) {
         menuShowMainItem();
         eventListenersRemover();
     }
+
     if (event.target.classList.contains('comments') || event.target.parentElement.classList.contains('comments')) {
         menuElementsHiden();
-        menuBurger.style.display = 'inline-block';
-        menuComments.style.display = 'inline-block';
-        menuCommentsTools.style.display = 'inline-block';
-
-        commentsContainer.style.zIndex = 2;
-        doodle.style.zIndex = 1;
-
-        commentsContainer.addEventListener('click', commentWorker);
+        menuShowCommentsItem();
     }
+
     if (event.target.classList.contains('draw') || event.target.parentElement.classList.contains('draw')) {
         menuElementsHiden();
         menuDraw.style.display = 'inline-block';
@@ -175,6 +216,7 @@ function menuWorker(event) {
         doodle.style.zIndex = 2;
         paint();
     }
+
     if (event.target.classList.contains('share') || event.target.parentElement.classList.contains('share')) {
         menuShowShareItem()
     }
@@ -255,7 +297,7 @@ function checkMenuSize() {
         return memo;
     }, 0)
     //вычисляем размер бордеров
-    const bordersWidth = parseInt(getComputedStyle(menu).borderLeftWidth) + parseInt(getComputedStyle(menu).borderRightWidth)
+    const bordersWidth = parseInt(getComputedStyle(menu).borderLeftWidth) + parseInt(getComputedStyle(menu).borderRightWidth);
     //проверяем выходит ли меню за пределы окна
     if (menu.getBoundingClientRect().x + Math.ceil(menuWidth) > document.documentElement.offsetWidth) {
         //  если выходит, то передвигаем влево на минимальное безопасное расстояние
@@ -269,7 +311,7 @@ function eventListenersRemover() {
     doodle.removeEventListener("mouseleave", canvasDrawingFalse);
     doodle.removeEventListener("mousemove", canvasMousemove);
 
-    commentsContainer.removeEventListener('click', commentWorker)
+    commentsContainer.removeEventListener('click', commentWorker);
 }
 
 
@@ -293,7 +335,7 @@ function imgLoad(file) {
 
         imgXML.addEventListener('loadstart', () => imgLoader.style.display = 'block');
         imgXML.addEventListener('loadend', () => imgLoader.style.display = 'none');
-        imgXML.addEventListener('error', () => finder('.serverError').style.display = 'block')
+        imgXML.addEventListener('error', () => finder('.serverError').style.display = 'block');
 
         imgXML.addEventListener('load', function() {
 
@@ -305,36 +347,9 @@ function imgLoad(file) {
             if (imgXML.status === 200) {
 
                 const response = JSON.parse(imgXML.responseText);
-                img.src = response.url;
-                mask.src = '';
-                localStorage.id = response.id;
 
-                const ws = new WebSocket(`wss://neto-api.herokuapp.com/pic/${localStorage.id}`);
-
-                setInterval( () => {
-                    if ( !drawing && needsSend) {
-                        doodle.toBlob((el) => ws.send(el));
-                        needsSend = false;
-                    }
-                }, 1000);
-
-                ws.addEventListener('message', wsMessage)
-
-
-                // console.log(localStorage.id)
-                img.addEventListener('load', function() {
-                    menuShowShareItem();
-
-                    imgSrc = true;
-                    const imgBound = img.getBoundingClientRect();
-
-                    elementStyler(doodle, imgBound);
-                    // elementStyler(mask, imgBound);
-                    elementStyler(commentsContainer, imgBound);
-
-                    commentsContainer.style.width = imgBound.width + 'px';
-                    commentsContainer.style.height = imgBound.height + 'px';
-                });
+                imgWorker(response);
+                menuShowShareItem();
 
             }
 
@@ -347,10 +362,47 @@ function imgLoad(file) {
 
     } else { // иначе осталяем тольок пункт меню загрузить и выводим ошибку
         start();
-        imgTypeError.style.display = 'block'
+        imgTypeError.style.display = 'block';
     }
 
 }
+
+function imgWorker(response) {
+    img.src = response.url;
+    mask.src = '';
+
+    sessionStorage.id = response.id;
+
+    const ws = new WebSocket(`wss://neto-api.herokuapp.com/pic/${sessionStorage.id}`);
+
+    doodle.addEventListener('mouseup', debounce);
+    function debounce() {
+        return setTimeout( () => {
+            if (!drawing && needsSend) {
+                console.log('sendsendsendsend');
+                doodle.toBlob((el) => ws.send(el));
+                needsSend = false;
+            }
+        }, 1000)
+    }
+
+    ws.addEventListener('message', wsMessage)
+
+    img.addEventListener('load', function() {
+
+        imgSrc = true;
+        const imgBound = img.getBoundingClientRect();
+
+        elementStyler(doodle, imgBound);
+        elementStyler(commentsContainer, imgBound);
+        commentsContainer.style.width = imgBound.width + 'px';
+        commentsContainer.style.height = imgBound.height + 'px';
+        if (response.mask) {
+            elementStyler(mask, imgBound);
+        }
+    });
+}
+
 
 function elementStyler(doodle, imgBound) {
     doodle.style.position = 'absolute';
@@ -363,12 +415,12 @@ function elementStyler(doodle, imgBound) {
 }
 
 function imgLoadDrop(event) {
-    event.preventDefault();                         // предовращаем открытие
+    event.preventDefault();                             // предовращаем открытие
     if (!imgSrc) {
         const file = event.dataTransfer.files[0];       // получаем файл
         imgLoad(file);                                  // отображаем файл
     } else {
-        finder('.dragError').style.display = 'block';
+        finder('.dragError').style.display = 'block';   // отображает ошибку, если файл не  того типа
     }
 }
 
@@ -411,16 +463,8 @@ function tick () {
             circle(curve.curve[0], curve.color);
             smoothCurve(curve.curve, curve.color);
         });
-        needsRepaint = false;
-        // const now = new Date();
-        // if (now - date > 1000) {
-        //     console.log('gogogogogogogogog');
-        //     date = new Date(now);
-        //     const wss = new WebSocket(`wss://neto-api.herokuapp.com/pic/${localStorage.id}`);
 
-        //     wss.addEventListener('message', wsMessage)
-        //     wss.send(doodle.toDataURL());
-        // }
+        needsRepaint = false;
     }
     window.requestAnimationFrame(tick);
 }
@@ -466,30 +510,19 @@ function canvasDrawingFalse() {
 function commentWorker(event) {
 
     event.stopPropagation();
-    // console.log(event.target);
 
     if (event.currentTarget === event.target) {
 
         newCommentChecker();
 
-        const comment = commentFormMaker();
-        comment.style.display = 'block';
-        comment.style.position = 'absolute';
-        comment.style.top = event.offsetY + 'px';
-        comment.style.left = event.offsetX + 'px';
-        comment.dataset.id = 'new';
+        commentFormAppender(event.offsetY, event.offsetX);
 
-        const commentCheckBox = finder('.comments__marker-checkbox', comment);
-        commentCheckBox.addEventListener('click', onlyOneOpenCommentBody)
-
-        commentsContainer.appendChild(comment);
     }
 
     if (event.target.classList.contains('comments__close')) {
        
         if (event.target.parentElement.parentElement.dataset.id === 'new') {
-            // console.log('deldeldeldel');
-            event.target.parentElement.parentElement.parentElement.removeChild(event.target.parentElement.parentElement)
+            event.target.parentElement.parentElement.parentElement.removeChild(event.target.parentElement.parentElement);
         } else {
             finder('.comments__marker-checkbox', event.target.parentElement.parentElement).checked = false;
         }
@@ -502,8 +535,9 @@ function commentWorker(event) {
         const commentText = finder('.comments__input', event.target.parentElement).value.trim();
         
         if (commentText !== '') {
-            const commentBounding = event.target.parentElement.parentElement.getBoundingClientRect();
-            // console.log(commentBounding);
+
+            const y = parseInt(event.target.parentElement.parentElement.style.top);
+            const x = parseInt(event.target.parentElement.parentElement.style.left);
 
             // приходит 500 ошибка и сообщение что не заданы кординаты
             // const messageFormData = new FormData();
@@ -520,10 +554,10 @@ function commentWorker(event) {
             // }
 
             // приходит ответ
-            const body = `message=${commentText}&left=${commentBounding.left}&top=${commentBounding.top}`;
+            const body = `message=${commentText}&left=${x}&top=${y}`;
 
             const messageXHR = new XMLHttpRequest();
-            const url = `${apiURL}/pic/${localStorage.id}/comments`;
+            const url = `${apiURL}/pic/${sessionStorage.id}/comments`;
 
             const loader = commentLoaderFinder(event.target.parentElement);
             
@@ -545,20 +579,38 @@ function commentWorker(event) {
 
 }
 
+// создает форму комментария и доавляет ее в контейнер принимает координаты комментария числа
+function commentFormAppender(y, x) {
+
+    const comment = commentFormMaker();
+    comment.style.display = 'block';
+    comment.style.position = 'absolute';
+    comment.style.top = y + 'px';
+    comment.style.left = x + 'px';
+    comment.dataset.id = 'new';
+
+    const commentCheckBox = finder('.comments__marker-checkbox', comment);
+    commentCheckBox.addEventListener('click', onlyOneOpenCommentBody)
+
+    commentsContainer.appendChild(comment);
+
+}
+
+// показывает все комментарии
 function commentsShower() {
-    console.log('on');
     finderAll('.comments__form', commentsContainer).forEach( el => {
-        el.style.display = 'block'
+        el.style.display = 'block';
     })
 }
 
+// скрывает все комментарии
 function commentsHider() {
-    console.log('off');
     finderAll('.comments__form', commentsContainer).forEach( el => {
-        el.style.display = 'none'
+        el.style.display = 'none';
     })
 }
 
+// ищет и возвращает контейнер с индикацией загрузки комментария
 function commentLoaderFinder(constainer) {
     return  finderAll( '.comment', constainer).find( el => {
         if (el.firstElementChild.classList.contains('loader')) {
@@ -567,10 +619,15 @@ function commentLoaderFinder(constainer) {
     })
 }
 
+//  ищет и возвращает все коментарии в коммент контейнере 
 function commentsFinder() {
-    return finderAll('.comments__form', commentsContainer)
+    return finderAll('.comments__form', commentsContainer);
 }
 
+
+// проверяет кооментарии, удаляет не активные комментарии
+// или закрывает открытое тело активного комментария
+// используется при клике на чекр открывающий тело комментария
 function onlyOneOpenCommentBody() {
     const comments = commentsFinder();
     comments.forEach( el => {
@@ -584,6 +641,8 @@ function onlyOneOpenCommentBody() {
     })
 }
 
+// делает тоже самое что предыдущая
+// используется при добавлении нового коментария при клики на коммент контейнер
 function newCommentChecker() {
     const comments = commentsFinder();
     comments.forEach( el => {
@@ -595,37 +654,64 @@ function newCommentChecker() {
     })
 }
 
+// принимает штамп даты возвращает дату в формате комментария
+function dateMaker(timestamp) {
+    const date = new Date(timestamp);
+    let mounth = '' + (date.getMonth() + 1);
+    if (mounth.length === 1) {
+        mounth = '0' + mounth;
+    }
 
+    return `${date.getDate()}.${mounth}.${('' + date.getFullYear()).slice(2)} ${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`;
+}
+
+// используется на собитии message вэбсокета
 function wsMessage(event) {
     const response = JSON.parse(event.data)
-    console.log(response)
 
     if (response.event === 'comment') {
-        // console.log('comment');
-        const comments = commentsFinder();
-        comments.forEach( el => {
-            const commentBounding = el.getBoundingClientRect()
-            if (commentBounding.top === response.comment.top && commentBounding.left === response.comment.left) {
-                // console.log('find');
-                el.dataset.id = 'active';
-                const date = new Date(response.comment.timestamp);
-                let mounth = '' + (date.getMonth() + 1);
-                if (mounth.length === 1) {
-                    mounth = '0' + mounth;
-                }
+        // при событии сообщение добавляет сооющение в нужную форму
+        commentAdder(response.comment.top, response.comment.left, response.comment.message, response.comment.timestamp);
 
-                const dateStr = `${date.getDate()}.${mounth}.${('' + date.getFullYear()).slice(2)} ${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`
-                // console.log(commentMaker(dateStr, response.comment.message));
-                finder('.comments__body', el).insertBefore(commentMaker(dateStr, response.comment.message), commentLoaderFinder(finder('.comments__body', el)))
-            }
-        })
     }
 
     if (response.event === 'mask') {
-        console.log('masmasmasmasmasmas')
+        // при событии маска обновляем маску
+        console.log('mask uprade')
         const imgBound = img.getBoundingClientRect();
         elementStyler(mask, imgBound);
         mask.src = response.url;
     }
 
+}
+
+// добавляет комментария вформу комментария
+//принимает координаты нужной формы комментария - числа, текст сообщения и штамп даты
+function commentAdder(top, left, message, timestamp) {
+    // ищем все комментарии
+    const comments = commentsFinder();
+    // ищем форму, в которую нужно давить комментария
+    const currenComment = comments.find( el => {
+        if (parseInt(el.style.top) === top && parseInt(el.style.left) === left) {
+            return true;
+        }
+    })
+    // если нашли
+    if (currenComment) {
+        // console.log(currenComment);
+        currenComment.dataset.id = 'active';                  // помечаем форму как активную
+        const dateStr = dateMaker(timestamp);                 // получаем струку с датой нужного формата
+        // в тело комеентария вставляем комментарий перед лоадером, тоесть как последний на данный момент
+        finder('.comments__body', currenComment) 
+            .insertBefore( 
+                commentMaker(dateStr, message), commentLoaderFinder(finder('.comments__body', currenComment)
+            ))
+    } else { 
+        console.log('formcreating')
+        // иначе создаем форму комментария в нужном месте
+        // и запускам еще раз для добавления первого комментария
+        //нужно в том случае, если функция используется при загрузке по ссылке или при обновлении страницы
+        commentFormAppender(top, left);
+        commentAdder(top, left, message, timestamp);
+    }
 }

@@ -12,6 +12,8 @@ const menuDraw = finder('.draw', menu);
 const menuDrawTools = finder('.draw-tools', menu);
 const menuShare = finder('.share', menu);
 const menuShareTools = finder('.share-tools', menu);
+const menuShareUrl = finder('.menu__url', menuShareTools);
+const menuShareCopyButton = finder('.menu_copy', menuShareTools);
 
 // вспомогательные переменные для перетаскивания меню
 let moved;
@@ -61,13 +63,8 @@ let actualColor = paintingColors[ colorInputs.find( el => {return el.hasAttribut
 //инпуты, скрывающие - показывающие комментарии
 const commentsToggleInputs = finderAll('.menu__toggle', menuCommentsTools);
 
-
 const commentsForm = finder('.comments__form');
 const commentsContainer = document.createElement('div');
 commentsContainer.classList.add('commentsContainer');
 commentsContainer.style.position = 'relative';
 app.insertBefore(commentsContainer, doodle.nextElementSibling);
-
-console.log(window.location)
-console.log(window.location.search);
-console.log(window.location.pathname + window.location.search)

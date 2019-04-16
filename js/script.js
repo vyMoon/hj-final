@@ -1,5 +1,3 @@
-'use strict';
-
 // после загрузки страницы
 document.addEventListener('DOMContentLoaded', start);
 
@@ -31,4 +29,16 @@ commentsToggleInputs.forEach( el => {
     }
 });
 
-console.log(1)
+// отмена  захвата значения, чтобы случайно не дропнуть его в окно
+menuShareUrl.addEventListener('mousedown', event => event.preventDefault());
+// копирование ссылки
+menuShareCopyButton.addEventListener('click', () => {
+    console.log('copy');
+    menuShareUrl.select();
+    document.execCommand('copy');
+})
+
+window.addEventListener('resize', () => {
+    // console.log('resize');
+    checkMenuSize();
+})
